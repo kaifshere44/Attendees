@@ -1,0 +1,37 @@
+{
+  "backupDate": "2026-10-14T09:02:42.341Z",
+  "counts": {
+    "admins": 2,
+    "students": 71,
+    "sessions": 32,
+    "attendance": 23,
+    "issues": 17
+  },
+  "files": {
+    "admins": {
+      "file": "admins_backup_2026-10-14T09-02-41-606Z.json",
+      "bytes": 855,
+      "count": 2
+    },
+    "students": {
+      "file": "students_backup_2026-10-14T09-02-41-606Z.json",
+      "bytes": 25340,
+      "count": 71
+    },
+    "sessions": {
+      "file": "sessions_backup_2026-10-14T09-02-41-606Z.json",
+      "bytes": 17216,
+      "count": 32
+    },
+    "attendance": {
+      "file": "attendance_backup_2026-10-14T09-02-41-606Z.json",
+      "bytes": 6810,
+      "count": 23
+    },
+    "issues": {
+      "file": "issues_backup_2026-10-14T09-02-41-606Z.json",
+      "bytes": 6592,
+      "count": 17
+    }
+  }
+}

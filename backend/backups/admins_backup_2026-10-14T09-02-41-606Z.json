@@ -1,0 +1,28 @@
+[
+  {
+    "_id": "6ace6d6f8644134445f8eae3",
+    "username": "standard_admin",
+    "email": "admin@standard.com",
+    "passwordHash": "$2b$10$sOxjSXkO2Wo0Dtdi8LahwOP7WNYSTWaTaEr9SmGNkDUCfxikoJSUm",
+    "role": "ADMIN_STANDARD",
+    "isActive": true,
+    "failedLoginAttempts": 0,
+    "createdAt": "2026-10-13T17:42:07.686Z",
+    "updatedAt": "2026-10-14T08:59:41.896Z",
+    "__v": 0,
+    "lastLogin": "2026-10-14T08:59:41.895Z"
+  },
+  {
+    "_id": "6ace6d6f8644134445f8eae4",
+    "username": "super_admin",
+    "email": "admin@super.com",
+    "passwordHash": "$2b$10$YujzT81wCK3OYcjCLBnmC.RAEi0KIewb./MMuyFFNPnM2vtnZs8Vm",
+    "role": "ADMIN_SUPER",
+    "isActive": true,
+    "failedLoginAttempts": 0,
+    "createdAt": "2026-10-13T17:42:07.828Z",
+    "updatedAt": "2026-10-14T08:59:40.546Z",
+    "__v": 0,
+    "lastLogin": "2026-10-14T08:59:40.546Z"
+  }
+]

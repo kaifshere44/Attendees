@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="boardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E5C298"/>
+      <stop offset="100%" stop-color="#C5A059"/>
+    </linearGradient>
+    <linearGradient id="clipGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1C2841"/>
+      <stop offset="100%" stop-color="#2D3E61"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1C2841" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)" transform="rotate(-6 256 256)">
+    <!-- Clipboard Base (Burlywood) -->
+    <rect x="116" y="80" width="280" height="360" rx="32" fill="url(#boardGrad)" stroke="#A07D3E" stroke-width="4"/>
+    
+    <!-- White Paper Sheet -->
+    <rect x="140" y="112" width="232" height="312" rx="16" fill="#FFFFFF"/>
+
+    <!-- Top Metallic Clip -->
+    <path d="M196,112 C196,94.327 210.327,80 228,80 L284,80 C301.673,80 316,94.327 316,112 L316,128 L196,128 Z" fill="url(#clipGrad)"/>
+    <circle cx="256" cy="104" r="6" fill="#DEB887"/>
+
+    <!-- Checkmark Circle & Tick -->
+    <circle cx="256" cy="204" r="42" fill="#1C2841" opacity="0.08"/>
+    <circle cx="256" cy="204" r="32" fill="#1C2841" opacity="0.12"/>
+    <path d="M236,204 L248,216 L278,186" fill="none" stroke="#1C2841" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Attendance Lines -->
+    <rect x="176" y="272" width="160" height="12" rx="6" fill="#1C2841" opacity="0.15"/>
+    <rect x="176" y="308" width="120" height="12" rx="6" fill="#1C2841" opacity="0.15"/>
+    <rect x="176" y="344" width="140" height="12" rx="6" fill="#1C2841" opacity="0.15"/>
+  </g>
+</svg>

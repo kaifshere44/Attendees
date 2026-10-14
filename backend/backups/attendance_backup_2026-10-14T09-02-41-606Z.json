@@ -1,0 +1,209 @@
+[
+  {
+    "_id": "6acef0d8b96d4d0c65b719a5",
+    "studentId": "6acef0d7b96d4d0c65b719a3",
+    "sessionId": "6acef0d7b96d4d0c65b719a4",
+    "attendanceTimestamp": "2026-10-14T03:02:48.366Z",
+    "createdAt": "2026-10-14T03:02:48.403Z",
+    "updatedAt": "2026-10-14T03:02:48.403Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acef47cb96d4d0c65b719a9",
+    "studentId": "6acef417b96d4d0c65b719a7",
+    "sessionId": "6acef45eb96d4d0c65b719a8",
+    "attendanceTimestamp": "2026-10-14T03:18:20.662Z",
+    "createdAt": "2026-10-14T03:18:20.701Z",
+    "updatedAt": "2026-10-14T03:18:20.701Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acef993a911dbda64924b84",
+    "studentId": "6acef993a911dbda64924b82",
+    "sessionId": "6acef993a911dbda64924b83",
+    "attendanceTimestamp": "2026-10-14T03:40:03.944Z",
+    "createdAt": "2026-10-14T03:40:03.984Z",
+    "updatedAt": "2026-10-14T03:40:03.984Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acefd8e542d0e203a863869",
+    "studentId": "6acefd8e542d0e203a863868",
+    "sessionId": "6acefd8e542d0e203a863867",
+    "attendanceTimestamp": "2026-10-14T03:57:02.857Z",
+    "createdAt": "2026-10-14T03:57:02.895Z",
+    "updatedAt": "2026-10-14T03:57:02.895Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acefda9542d0e203a86386d",
+    "studentId": "6acefda8542d0e203a86386b",
+    "sessionId": "6acefda8542d0e203a86386c",
+    "attendanceTimestamp": "2026-10-14T03:57:29.270Z",
+    "createdAt": "2026-10-14T03:57:29.321Z",
+    "updatedAt": "2026-10-14T03:57:29.321Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acefdf9c395fb99b2fc0460",
+    "studentId": "6acefdf7c395fb99b2fc045e",
+    "sessionId": "6acefdf7c395fb99b2fc045f",
+    "attendanceTimestamp": "2026-10-14T03:58:49.025Z",
+    "createdAt": "2026-10-14T03:58:49.104Z",
+    "updatedAt": "2026-10-14T03:58:49.104Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acefe03c395fb99b2fc0463",
+    "studentId": "6acefe03c395fb99b2fc0462",
+    "sessionId": "6acefe03c395fb99b2fc0461",
+    "attendanceTimestamp": "2026-10-14T03:58:59.862Z",
+    "createdAt": "2026-10-14T03:58:59.902Z",
+    "updatedAt": "2026-10-14T03:58:59.902Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acefe94c395fb99b2fc0467",
+    "studentId": "6acefe94c395fb99b2fc0466",
+    "sessionId": "6acefe93c395fb99b2fc0465",
+    "attendanceTimestamp": "2026-10-14T04:01:24.507Z",
+    "createdAt": "2026-10-14T04:01:24.544Z",
+    "updatedAt": "2026-10-14T04:01:24.544Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf0620c395fb99b2fc0471",
+    "studentId": "6acf0620c395fb99b2fc0470",
+    "sessionId": "6acf061fc395fb99b2fc046f",
+    "attendanceTimestamp": "2026-10-14T04:33:36.302Z",
+    "createdAt": "2026-10-14T04:33:36.358Z",
+    "updatedAt": "2026-10-14T04:33:36.358Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf0a9230372902a4249748",
+    "studentId": "6acf0a9130372902a4249747",
+    "sessionId": "6acf0a9030372902a4249746",
+    "attendanceTimestamp": "2026-10-14T04:52:34.170Z",
+    "createdAt": "2026-10-14T04:52:34.215Z",
+    "updatedAt": "2026-10-14T04:52:34.215Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf0c9c30372902a424974b",
+    "studentId": "6acf0bd830372902a424974a",
+    "sessionId": "6acf0a9030372902a4249746",
+    "attendanceTimestamp": "2026-10-14T05:01:16.526Z",
+    "createdAt": "2026-10-14T05:01:16.657Z",
+    "updatedAt": "2026-10-14T05:01:16.657Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf0d3d30372902a424974e",
+    "studentId": "6acf0d3c30372902a424974c",
+    "sessionId": "6acf0d3c30372902a424974d",
+    "attendanceTimestamp": "2026-10-14T05:03:57.026Z",
+    "createdAt": "2026-10-14T05:03:57.063Z",
+    "updatedAt": "2026-10-14T05:03:57.063Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf0d4730372902a4249751",
+    "studentId": "6acf0d4730372902a4249750",
+    "sessionId": "6acf0d4630372902a424974f",
+    "attendanceTimestamp": "2026-10-14T05:04:07.337Z",
+    "createdAt": "2026-10-14T05:04:07.371Z",
+    "updatedAt": "2026-10-14T05:04:07.371Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf1c4b106faf1c7ecc84e4",
+    "studentId": "6acf1c4b106faf1c7ecc84e3",
+    "sessionId": "6acf1c4a106faf1c7ecc84e2",
+    "attendanceTimestamp": "2026-10-14T06:08:11.830Z",
+    "createdAt": "2026-10-14T06:08:11.865Z",
+    "updatedAt": "2026-10-14T06:08:11.865Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf1c96106faf1c7ecc84e8",
+    "studentId": "6acf1c95106faf1c7ecc84e6",
+    "sessionId": "6acf1c95106faf1c7ecc84e7",
+    "attendanceTimestamp": "2026-10-14T06:09:26.466Z",
+    "createdAt": "2026-10-14T06:09:26.501Z",
+    "updatedAt": "2026-10-14T06:09:26.501Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf26e82c1571d310ed8193",
+    "studentId": "6acf26e82c1571d310ed8192",
+    "sessionId": "6acf26e72c1571d310ed8191",
+    "attendanceTimestamp": "2026-10-14T06:53:28.533Z",
+    "createdAt": "2026-10-14T06:53:28.570Z",
+    "updatedAt": "2026-10-14T06:53:28.570Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf27422c1571d310ed8197",
+    "studentId": "6acf27412c1571d310ed8195",
+    "sessionId": "6acf27422c1571d310ed8196",
+    "attendanceTimestamp": "2026-10-14T06:54:58.890Z",
+    "createdAt": "2026-10-14T06:54:58.927Z",
+    "updatedAt": "2026-10-14T06:54:58.927Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf279d2c1571d310ed819c",
+    "studentId": "6acf279c2c1571d310ed819a",
+    "sessionId": "6acf279c2c1571d310ed819b",
+    "attendanceTimestamp": "2026-10-14T06:56:29.163Z",
+    "createdAt": "2026-10-14T06:56:29.215Z",
+    "updatedAt": "2026-10-14T06:56:29.215Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf2a96abfdef0bd544ff41",
+    "studentId": "6acf2a95abfdef0bd544ff3f",
+    "sessionId": "6acf2a95abfdef0bd544ff40",
+    "attendanceTimestamp": "2026-10-14T07:09:10.671Z",
+    "createdAt": "2026-10-14T07:09:10.712Z",
+    "updatedAt": "2026-10-14T07:09:10.712Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf34c35d01a04e7a4bc78d",
+    "studentId": "6acf34c25d01a04e7a4bc78b",
+    "sessionId": "6acf34c25d01a04e7a4bc78c",
+    "attendanceTimestamp": "2026-10-14T07:52:35.214Z",
+    "createdAt": "2026-10-14T07:52:35.260Z",
+    "updatedAt": "2026-10-14T07:52:35.260Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf35de5d01a04e7a4bc790",
+    "studentId": "6acf35dc5d01a04e7a4bc78e",
+    "sessionId": "6acf35dc5d01a04e7a4bc78f",
+    "attendanceTimestamp": "2026-10-14T07:57:18.538Z",
+    "createdAt": "2026-10-14T07:57:18.576Z",
+    "updatedAt": "2026-10-14T07:57:18.576Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf3ef229b5acea819818af",
+    "studentId": "6acf3ef129b5acea819818ad",
+    "sessionId": "6acf3ef129b5acea819818ae",
+    "attendanceTimestamp": "2026-10-14T08:36:02.731Z",
+    "createdAt": "2026-10-14T08:36:02.769Z",
+    "updatedAt": "2026-10-14T08:36:02.769Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acf404529b5acea819818b2",
+    "studentId": "6acf404429b5acea819818b0",
+    "sessionId": "6acf404529b5acea819818b1",
+    "attendanceTimestamp": "2026-10-14T08:41:41.902Z",
+    "createdAt": "2026-10-14T08:41:41.937Z",
+    "updatedAt": "2026-10-14T08:41:41.937Z",
+    "__v": 0
+  }
+]

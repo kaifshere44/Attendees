@@ -241,7 +241,7 @@ const StudentPage = () => {
 
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg p-4 md:p-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-yankees-blue mb-2 text-center">Smart Attendance System</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-yankees-blue mb-2 text-center">Mark your Attendance</h1>
           <p className="text-gray-600 text-center mb-6 md:mb-8 text-sm md:text-base">Enter your roll number to continue</p>
 
           {step === 'rollcheck' && (

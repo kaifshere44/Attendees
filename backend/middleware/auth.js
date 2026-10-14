@@ -8,7 +8,8 @@ const protect = async (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
+      const decoded = jwt.verify(token, jwtSecret);
 
       req.admin = await Admin.findById(decoded.id).select('-passwordHash');
 

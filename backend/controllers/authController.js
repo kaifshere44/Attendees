@@ -52,9 +52,10 @@ const loginAdmin = async (req, res) => {
     await admin.save();
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production-min-32-chars';
     const token = jwt.sign(
       { id: admin._id, role: admin.role },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '24h' }
     );
 

@@ -1,6 +1,19 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const getBaseUrl = () => {
+  let url = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
+  // Strip trailing slashes
+  url = url.replace(/\/+$/, '');
+  // Ensure the base URL ends with /api
+  if (!url.endsWith('/api')) {
+    url = `${url}/api`;
+  }
+  return url;
+};
+
+const API_URL = getBaseUrl();
+
+console.info(`[API Service] Active Backend Base URL: ${API_URL}`);
 
 const api = axios.create({
   baseURL: API_URL,

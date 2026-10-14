@@ -51,7 +51,8 @@ const exportSessionExcel = async (req, res) => {
     // Only students who attended this specific session
     const attendance = await Attendance.find({ sessionId })
       .populate('studentId', 'name rollNumber branch')
-      .sort({ attendanceTimestamp: 1 });
+      .sort({ attendanceTimestamp: 1 })
+      .lean();
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Attendance Management System';
@@ -146,7 +147,8 @@ const exportSessionPdf = async (req, res) => {
     // Only students who attended this specific session
     const attendance = await Attendance.find({ sessionId })
       .populate('studentId', 'name rollNumber branch')
-      .sort({ attendanceTimestamp: 1 });
+      .sort({ attendanceTimestamp: 1 })
+      .lean();
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -250,7 +252,7 @@ const exportSessionPdf = async (req, res) => {
 // @access  Private (Super Admin)
 const exportStudentsExcel = async (req, res) => {
   try {
-    const students = await Student.find().sort({ rollNumber: 1 });
+    const students = await Student.find().sort({ rollNumber: 1 }).lean();
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Attendance Management System';
@@ -338,7 +340,7 @@ const exportStudentsExcel = async (req, res) => {
 // @access  Private (Super Admin)
 const exportStudentsPdf = async (req, res) => {
   try {
-    const students = await Student.find().sort({ rollNumber: 1 });
+    const students = await Student.find().sort({ rollNumber: 1 }).lean();
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
@@ -435,7 +437,7 @@ const exportStudentsPdf = async (req, res) => {
   }
 };
 
-// @desc    Get attendance history with filters
+// @desc    Get attendance history with filters (optimized with DB-level student query and pagination)
 // @route   GET /api/reports/history
 // @access  Private (Super Admin)
 const getHistory = async (req, res) => {
@@ -444,8 +446,8 @@ const getHistory = async (req, res) => {
 
     let query = {};
 
-    if (sessionId) {
-      query.sessionId = sessionId;
+    if (sessionId && sessionId.trim()) {
+      query.sessionId = sessionId.trim();
     }
 
     if (startDate || endDate) {
@@ -458,43 +460,54 @@ const getHistory = async (req, res) => {
       }
     }
 
-    const attendance = await Attendance.find(query)
-      .populate('studentId', 'name rollNumber mobileNumber email branch semester')
-      .populate('sessionId', 'sessionName sessionDate')
-      .sort({ attendanceTimestamp: -1 });
-
-    let filteredAttendance = attendance;
-
-    if (rollNumber) {
-      filteredAttendance = filteredAttendance.filter(
-        record => record.studentId?.rollNumber?.toLowerCase().includes(rollNumber.toLowerCase())
-      );
+    // Filter by student attributes at DB level using indexed student queries
+    const studentQuery = {};
+    if (rollNumber && rollNumber.trim()) {
+      studentQuery.rollNumber = new RegExp(rollNumber.trim(), 'i');
+    }
+    if (studentName && studentName.trim()) {
+      studentQuery.name = new RegExp(studentName.trim(), 'i');
+    }
+    if (branch && branch.trim()) {
+      studentQuery.branch = new RegExp(branch.trim(), 'i');
+    }
+    if (semester && semester.trim()) {
+      studentQuery.semester = new RegExp(semester.trim(), 'i');
     }
 
-    if (studentName) {
-      filteredAttendance = filteredAttendance.filter(
-        record => record.studentId?.name?.toLowerCase().includes(studentName.toLowerCase())
-      );
+    if (Object.keys(studentQuery).length > 0) {
+      const matchingStudents = await Student.find(studentQuery).select('_id').lean();
+      const studentIds = matchingStudents.map(s => s._id);
+      query.studentId = { $in: studentIds };
     }
 
-    if (branch) {
-      filteredAttendance = filteredAttendance.filter(
-        record => record.studentId?.branch?.toLowerCase().includes(branch.toLowerCase())
-      );
-    }
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 500);
+    const skip = (page - 1) * limit;
 
-    if (semester) {
-      filteredAttendance = filteredAttendance.filter(
-        record => record.studentId?.semester?.toLowerCase().includes(semester.toLowerCase())
-      );
-    }
+    const [attendance, total] = await Promise.all([
+      Attendance.find(query)
+        .populate('studentId', 'name rollNumber mobileNumber email branch semester')
+        .populate('sessionId', 'sessionName sessionDate')
+        .sort({ attendanceTimestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Attendance.countDocuments(query),
+    ]);
 
     res.json({
       success: true,
-      attendance: filteredAttendance,
+      attendance,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit) || 1,
+      },
     });
   } catch (error) {
-    console.error(error);
+    console.error('getHistory error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

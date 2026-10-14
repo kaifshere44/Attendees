@@ -1,5 +1,6 @@
 const Session = require('../models/Session');
 const crypto = require('crypto');
+const { invalidateActiveSessionCache } = require('./attendanceController');
 
 // @desc    Create a new session
 // @route   POST /api/sessions
@@ -191,6 +192,7 @@ const openSession = async (req, res) => {
     session.startTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     session.endTime = expiresAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     await session.save();
+    invalidateActiveSessionCache();
 
     res.json({
       success: true,
@@ -228,6 +230,7 @@ const closeSession = async (req, res) => {
 
     session.status = 'Closed';
     await session.save();
+    invalidateActiveSessionCache();
 
     res.json({
       success: true,
@@ -263,6 +266,7 @@ const regeneratePin = async (req, res) => {
     session.pinHash = newPin;
     session.pin = newPin;
     await session.save();
+    invalidateActiveSessionCache();
 
     res.json({
       success: true,

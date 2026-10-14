@@ -23,8 +23,8 @@ const attendanceSchema = new mongoose.Schema({
 attendanceSchema.index({ studentId: 1, sessionId: 1 }, { unique: true });
 
 // Index for faster queries
-attendanceSchema.index({ sessionId: 1 });
-attendanceSchema.index({ studentId: 1 });
+attendanceSchema.index({ sessionId: 1, attendanceTimestamp: 1 });
+attendanceSchema.index({ studentId: 1, attendanceTimestamp: -1 });
 attendanceSchema.index({ attendanceTimestamp: -1 });
 
 module.exports = mongoose.model('Attendance', attendanceSchema);

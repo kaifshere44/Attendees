@@ -90,21 +90,28 @@ const StandardAdminDashboard = ({ onLogout }) => {
     fetchActiveSession();
     fetchBirthdayBadge();
 
-    // Poll for session updates every 10 seconds
+    // Poll for active session updates only when page is visible and on dashboard
     const interval = setInterval(() => {
-      fetchSessions();
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       fetchActiveSession();
-      fetchBirthdayBadge();
-    }, 10000);
+      if (activeTab === 'dashboard') {
+        fetchSessions();
+      }
+    }, 12000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [activeTab]);
 
   const activeSessionId = activeSession?.id;
   useEffect(() => {
     if (activeSessionId) {
       fetchAttendance(activeSessionId);
       const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return;
+        }
         fetchAttendance(activeSessionId);
       }, 10000);
       return () => clearInterval(interval);

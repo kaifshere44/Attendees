@@ -16,10 +16,17 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const issueRoutes = require('./routes/issueRoutes');
 
+const ensureAllIndexes = require('./scripts/ensureIndexes');
+
 const app = express();
 
-// Initialize MongoDB connection
-connectDB().catch((err) => {
+// Enable trust proxy for accurate client IP resolution behind Vercel/reverse proxies
+app.set('trust proxy', 1);
+
+// Initialize MongoDB connection and ensure indexes in background
+connectDB().then(() => {
+  ensureAllIndexes();
+}).catch((err) => {
   console.error('Initial MongoDB connection error:', err.message);
 });
 
@@ -29,6 +36,7 @@ app.use(cors({
   origin: (origin, callback) => callback(null, true),
   credentials: true,
   exposedHeaders: ['Content-Disposition'],
+  maxAge: 86400, // Cache preflight OPTIONS in browser for 24 hours
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

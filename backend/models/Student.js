@@ -47,4 +47,11 @@ const studentSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+// Indexes for fast roll number lookup, birthdays, and admin filters
+studentSchema.index({ dateOfBirth: 1 });
+studentSchema.index({ createdAt: -1 });
+studentSchema.index({ branch: 1, semester: 1 });
+studentSchema.index({ name: 1, rollNumber: 1 });
+
 module.exports = mongoose.model('Student', studentSchema);
+

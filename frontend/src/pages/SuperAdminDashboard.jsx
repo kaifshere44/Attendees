@@ -41,6 +41,13 @@ const SuperAdminDashboard = ({ onLogout }) => {
     durationMinutes: 10,
   });
   const [birthdayBadge, setBirthdayBadge] = useState({ today: 0, upcoming: 0 });
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentPage, setStudentPage] = useState(1);
+  const [studentPagination, setStudentPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
+  const [historyLoading, setHistoryLoading] = useState(false);
   const navigate = useNavigate();
 
   const admin = authService.getCurrentAdmin();
@@ -85,21 +92,39 @@ const SuperAdminDashboard = ({ onLogout }) => {
     }
   };
 
-  const fetchStudents = async () => {
+  const fetchStudents = async (page = 1, search = studentSearch) => {
+    setStudentsLoading(true);
     try {
-      const response = await api.get('/students');
+      const response = await api.get('/students', {
+        params: { page, limit: 50, search: search.trim() },
+      });
       setStudents(response.data.students || []);
+      if (response.data.pagination) {
+        setStudentPagination(response.data.pagination);
+        setStudentPage(page);
+      }
     } catch (error) {
       console.error('Error fetching students:', error);
+    } finally {
+      setStudentsLoading(false);
     }
   };
 
-  const fetchHistory = async () => {
+  const fetchHistory = async (page = 1) => {
+    setHistoryLoading(true);
     try {
-      const response = await api.get('/reports/history', { params: filters });
+      const response = await api.get('/reports/history', {
+        params: { ...filters, page, limit: 50 },
+      });
       setHistoryAttendance(response.data.attendance || []);
+      if (response.data.pagination) {
+        setHistoryPagination(response.data.pagination);
+        setHistoryPage(page);
+      }
     } catch (error) {
       console.error('Error fetching history:', error);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -154,29 +179,46 @@ const SuperAdminDashboard = ({ onLogout }) => {
     }
   };
 
+  // Lazy-load data when switching tabs so initial dashboard load is instant
+  useEffect(() => {
+    if (activeTab === 'students' && students.length === 0) {
+      fetchStudents(1, studentSearch);
+    } else if (activeTab === 'history' && historyAttendance.length === 0) {
+      fetchHistory(1);
+    } else if (activeTab === 'issues' && issues.length === 0) {
+      fetchIssues();
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     fetchSessions();
     fetchActiveSession();
-    fetchStudents();
-    fetchIssues();
     fetchBirthdayBadge();
 
-    // Poll for updates every 10 seconds
+    // Poll for active session updates only when window is active and on relevant tab
     const interval = setInterval(() => {
-      fetchSessions();
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       fetchActiveSession();
-      fetchIssues();
-      fetchBirthdayBadge();
-    }, 10000);
+      if (activeTab === 'dashboard') {
+        fetchSessions();
+      } else if (activeTab === 'issues') {
+        fetchIssues();
+      }
+    }, 12000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [activeTab]);
 
   const activeSessionId = activeSession?.id;
   useEffect(() => {
     if (activeSessionId) {
       fetchAttendance(activeSessionId);
       const interval = setInterval(() => {
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+          return;
+        }
         fetchAttendance(activeSessionId);
       }, 10000);
       return () => clearInterval(interval);
@@ -990,10 +1032,54 @@ const SuperAdminDashboard = ({ onLogout }) => {
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6">
-                  <p className="text-gray-600 mb-4">Total Students: {students.length}</p>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-4">
+                    <p className="text-gray-600 font-medium">
+                      Total Students: {studentPagination.total || students.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                          type="text"
+                          value={studentSearch}
+                          onChange={(e) => setStudentSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              fetchStudents(1, studentSearch);
+                            }
+                          }}
+                          placeholder="Search name, roll, branch..."
+                          className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue"
+                        />
+                        {studentSearch && (
+                          <button
+                            onClick={() => {
+                              setStudentSearch('');
+                              fetchStudents(1, '');
+                            }}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => fetchStudents(1, studentSearch)}
+                        disabled={studentsLoading}
+                        className="px-4 py-2 bg-yankees-blue text-white rounded-lg hover:bg-opacity-90 transition text-sm disabled:opacity-50"
+                      >
+                        {studentsLoading ? <Loader2 size={16} className="animate-spin" /> : 'Search'}
+                      </button>
+                    </div>
+                  </div>
 
-                  {students.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">No students registered yet</p>
+                  {studentsLoading ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Loader2 size={32} className="animate-spin mx-auto text-yankees-blue mb-2" />
+                      <p>Loading students directory...</p>
+                    </div>
+                  ) : students.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No students found</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
@@ -1026,6 +1112,31 @@ const SuperAdminDashboard = ({ onLogout }) => {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {/* Student Pagination Controls */}
+                  {studentPagination.pages > 1 && (
+                    <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4 text-sm text-gray-600">
+                      <span>
+                        Page {studentPagination.page} of {studentPagination.pages} ({studentPagination.total} total)
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => fetchStudents(studentPage - 1, studentSearch)}
+                          disabled={studentPage <= 1 || studentsLoading}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => fetchStudents(studentPage + 1, studentSearch)}
+                          disabled={studentPage >= studentPagination.pages || studentsLoading}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1111,20 +1222,26 @@ const SuperAdminDashboard = ({ onLogout }) => {
                   </div>
 
                   <button
-                    onClick={fetchHistory}
-                    className="flex items-center gap-2 px-6 py-3 bg-yankees-blue text-white rounded-lg hover:bg-opacity-90 transition"
+                    onClick={() => fetchHistory(1)}
+                    disabled={historyLoading}
+                    className="flex items-center gap-2 px-6 py-3 bg-yankees-blue text-white rounded-lg hover:bg-opacity-90 transition disabled:opacity-50"
                   >
-                    <Search size={18} />
-                    Search
+                    {historyLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                    {historyLoading ? 'Searching...' : 'Search'}
                   </button>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-lg p-6">
                   <h3 className="text-xl font-semibold text-yankees-blue mb-4">
-                    Results ({historyAttendance.length})
+                    Results ({historyPagination.total || historyAttendance.length})
                   </h3>
 
-                  {historyAttendance.length === 0 ? (
+                  {historyLoading ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Loader2 size={32} className="animate-spin mx-auto text-yankees-blue mb-2" />
+                      <p>Searching attendance records...</p>
+                    </div>
+                  ) : historyAttendance.length === 0 ? (
                     <p className="text-gray-500 text-center py-8">No records found</p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1154,6 +1271,31 @@ const SuperAdminDashboard = ({ onLogout }) => {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+
+                  {/* History Pagination Controls */}
+                  {historyPagination.pages > 1 && (
+                    <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4 text-sm text-gray-600">
+                      <span>
+                        Page {historyPagination.page} of {historyPagination.pages} ({historyPagination.total} total records)
+                      </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => fetchHistory(historyPage - 1)}
+                          disabled={historyPage <= 1 || historyLoading}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => fetchHistory(historyPage + 1)}
+                          disabled={historyPage >= historyPagination.pages || historyLoading}
+                          className="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

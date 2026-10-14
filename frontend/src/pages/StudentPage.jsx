@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LogIn, Loader2 } from 'lucide-react';
 import api from '../services/api';
 import Toast from '../components/Toast';
@@ -82,36 +82,67 @@ const StudentPage = () => {
   const [toast, setToast] = useState(null);
   const [existingStudent, setExistingStudent] = useState(null);
 
+  // Client-side cache for instant roll number re-verification
+  const rollCacheRef = useRef(new Map());
+
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
   };
 
+  // Pre-warm backend serverless container and DB connection while student enters details
+  useEffect(() => {
+    api.get('/health').catch(() => {});
+  }, []);
+
   const handleRollCheck = async (e) => {
     e.preventDefault();
-    if (!rollNumber.trim()) {
+    const cleanRoll = rollNumber.trim().toUpperCase();
+    if (!cleanRoll) {
       showToast('Please enter a roll number', 'error');
+      return;
+    }
+
+    // Check client-side memory cache first (instantaneous 0ms response)
+    const cached = rollCacheRef.current.get(cleanRoll);
+    if (cached) {
+      if (cached.exists) {
+        setExistingStudent(cached.student);
+        setFormData((prev) => ({ ...prev, rollNumber: cached.student.rollNumber }));
+        setStep('attendance');
+        showToast('Student found! Please enter the PIN to mark attendance.', 'success');
+      } else {
+        setFormData((prev) => ({ ...prev, rollNumber: cleanRoll }));
+        setSelectedCourse('');
+        setCustomCourse('');
+        setStep('register');
+        showToast('New student. Please complete your registration.', 'info');
+      }
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.get(`/students/check/${rollNumber}`);
+      const response = await api.get(`/students/check/${encodeURIComponent(cleanRoll)}`);
+      // Cache response in memory
+      rollCacheRef.current.set(cleanRoll, response.data);
+
       if (response.data.exists) {
         setExistingStudent(response.data.student);
-        setFormData(prev => ({ ...prev, rollNumber: response.data.student.rollNumber }));
+        setFormData((prev) => ({ ...prev, rollNumber: response.data.student.rollNumber }));
         setStep('attendance');
         showToast('Student found! Please enter the PIN to mark attendance.', 'success');
       } else {
-        setFormData(prev => ({ ...prev, rollNumber: rollNumber.trim().toUpperCase() }));
+        setFormData((prev) => ({ ...prev, rollNumber: cleanRoll }));
         setSelectedCourse('');
         setCustomCourse('');
         setStep('register');
-        showToast('New student. Please complete your registration.', 'success');
+        showToast('New student. Please complete your registration.', 'info');
       }
     } catch (error) {
       showToast(error.response?.data?.message || 'Error checking roll number', 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleRegister = async (e) => {
@@ -137,57 +168,71 @@ const StudentPage = () => {
         semester: finalSemester,
       });
       if (response.data.success) {
+        const registeredStudent = {
+          id: response.data.student?.id,
+          name: response.data.student?.name || formData.name.trim(),
+          rollNumber: response.data.student?.rollNumber || formData.rollNumber,
+        };
+
+        // Cache newly registered student in client cache
+        rollCacheRef.current.set(registeredStudent.rollNumber, {
+          exists: true,
+          student: registeredStudent,
+        });
+
+        setExistingStudent(registeredStudent);
         showToast('Registration successful! Please enter the PIN to mark attendance.', 'success');
         setStep('attendance');
       }
     } catch (error) {
       showToast(error.response?.data?.message || 'Registration failed', 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handlePinVerification = async (e) => {
     e.preventDefault();
-    if (!pin.trim()) {
+    const cleanPin = pin.trim();
+    if (!cleanPin) {
       showToast('Please enter the PIN', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/attendance/verify-pin', { pin });
-      if (response.data.success) {
-        const attendanceResponse = await api.post('/attendance/mark', {
-          sessionId: response.data.session.id,
-          rollNumber: formData.rollNumber,
-        });
+      // Direct 1-step attendance submission with PIN and Roll Number (50% faster, 1 HTTP roundtrip)
+      const attendanceResponse = await api.post('/attendance/mark', {
+        rollNumber: formData.rollNumber,
+        pin: cleanPin,
+      });
 
-        if (attendanceResponse.data.success) {
-          showToast(
-            `Attendance marked successfully for ${attendanceResponse.data.attendance.sessionName}!`,
-            'success'
-          );
-          setPin('');
-          setStep('rollcheck');
-          setRollNumber('');
-          setFormData({
-            name: '',
-            rollNumber: '',
-            mobileNumber: '',
-            email: '',
-            branch: '',
-            semester: '',
-            dateOfBirth: '',
-          });
-          setSelectedCourse('');
-          setCustomCourse('');
-          setExistingStudent(null);
-        }
+      if (attendanceResponse.data.success) {
+        showToast(
+          `Attendance marked successfully for ${attendanceResponse.data.attendance.sessionName}!`,
+          'success'
+        );
+        setPin('');
+        setStep('rollcheck');
+        setRollNumber('');
+        setFormData({
+          name: '',
+          rollNumber: '',
+          mobileNumber: '',
+          email: '',
+          branch: '',
+          semester: '',
+          dateOfBirth: '',
+        });
+        setSelectedCourse('');
+        setCustomCourse('');
+        setExistingStudent(null);
       }
     } catch (error) {
       showToast(error.response?.data?.message || 'Error marking attendance', 'error');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

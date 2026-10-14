@@ -37,4 +37,6 @@ const issueReportSchema = new mongoose.Schema({
   timestamps: true,
 });
 
+issueReportSchema.index({ status: 1, createdAt: -1 });
+
 module.exports = mongoose.model('IssueReport', issueReportSchema);

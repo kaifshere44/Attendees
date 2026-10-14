@@ -37,10 +37,28 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Response interceptor to handle retries and error messages
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+
+    // Auto-retry idempotent GET requests once on network hiccup or cold-start timeout
+    if (config && (config.method || 'get').toLowerCase() === 'get' && !config._retry) {
+      const isNetworkIssue =
+        error.code === 'ECONNABORTED' ||
+        error.message === 'Network Error' ||
+        error.message?.includes('timeout') ||
+        error.response?.status === 503;
+
+      if (isNetworkIssue) {
+        config._retry = true;
+        // Wait 600ms before retrying once
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        return api(config);
+      }
+    }
+
     // Provide user-friendly messages for network drops and timeouts
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       const msg = 'Request timed out. Please check your internet connection and try again.';

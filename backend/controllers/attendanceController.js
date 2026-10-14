@@ -2,6 +2,32 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Session = require('../models/Session');
 
+// In-memory cache for currently active open session (TTL 4s)
+let cachedActiveSession = null;
+let cachedActiveSessionExpiry = 0;
+
+const invalidateActiveSessionCache = () => {
+  cachedActiveSession = null;
+  cachedActiveSessionExpiry = 0;
+};
+
+const getActiveOpenSessions = async () => {
+  const now = Date.now();
+  if (cachedActiveSession && now < cachedActiveSessionExpiry) {
+    if (!cachedActiveSession.expiresAt || new Date(cachedActiveSession.expiresAt).getTime() > now) {
+      return [cachedActiveSession];
+    }
+    invalidateActiveSessionCache();
+  }
+
+  const openSessions = await Session.find({ status: 'Open' }).limit(3).sort({ createdAt: -1 });
+  if (openSessions && openSessions.length > 0) {
+    cachedActiveSession = openSessions[0];
+    cachedActiveSessionExpiry = now + 4000;
+  }
+  return openSessions;
+};
+
 // @desc    Verify PIN
 // @route   POST /api/attendance/verify-pin
 // @access  Public
@@ -13,8 +39,8 @@ const verifyPin = async (req, res) => {
       return res.status(400).json({ message: 'PIN is required' });
     }
 
-    // Find open sessions
-    const openSessions = await Session.find({ status: 'Open' }).sort({ createdAt: -1 });
+    // Find open sessions (cached for 4s to handle concurrent requests)
+    const openSessions = await getActiveOpenSessions();
 
     if (!openSessions || openSessions.length === 0) {
       return res.status(400).json({ message: 'No active session found' });
@@ -28,6 +54,7 @@ const verifyPin = async (req, res) => {
       if (s.expiresAt && now > new Date(s.expiresAt)) {
         s.status = 'Closed';
         await s.save();
+        invalidateActiveSessionCache();
         continue;
       }
       const isPinValid = await s.comparePin(pin);
@@ -80,37 +107,68 @@ const verifyPin = async (req, res) => {
   }
 };
 
-// @desc    Mark attendance
+// @desc    Mark attendance (supports direct PIN submission or sessionId)
 // @route   POST /api/attendance/mark
 // @access  Public
 const markAttendance = async (req, res) => {
   try {
-    const { sessionId, rollNumber } = req.body;
+    const { sessionId, rollNumber, pin } = req.body;
 
-    if (!sessionId || !rollNumber) {
-      return res.status(400).json({ message: 'Session ID and roll number are required' });
+    if (!rollNumber || (!sessionId && !pin)) {
+      return res.status(400).json({ message: 'Roll number and either Session ID or PIN are required' });
     }
 
-    // Find student
-    const student = await Student.findOne({ rollNumber: rollNumber.trim().toUpperCase() });
+    const normalizedRollNumber = rollNumber.trim().toUpperCase();
+
+    // 1. Fetch student with projection
+    const student = await Student.findOne({ rollNumber: normalizedRollNumber })
+      .select('_id name rollNumber')
+      .lean();
 
     if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
+      return res.status(404).json({ message: 'Student not found. Please register first.' });
     }
 
-    // Find session
-    const session = await Session.findById(sessionId);
+    const now = new Date();
+    let session = null;
 
-    if (!session) {
-      return res.status(404).json({ message: 'Session not found' });
+    // 2. Identify session
+    if (sessionId) {
+      session = await Session.findById(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: 'Session not found' });
+      }
+    } else if (pin) {
+      // Direct PIN attendance flow: find matching active open session in 1 step!
+      const openSessions = await getActiveOpenSessions();
+      if (!openSessions || openSessions.length === 0) {
+        return res.status(400).json({ message: 'No active session found' });
+      }
+
+      for (const s of openSessions) {
+        if (s.expiresAt && now > new Date(s.expiresAt)) {
+          s.status = 'Closed';
+          await s.save();
+          invalidateActiveSessionCache();
+          continue;
+        }
+        const isPinValid = await s.comparePin(pin);
+        if (isPinValid) {
+          session = s;
+          break;
+        }
+      }
+
+      if (!session) {
+        return res.status(400).json({ message: 'Invalid PIN or session expired' });
+      }
     }
 
     if (session.status !== 'Open') {
       return res.status(400).json({ message: 'Session is not open for attendance' });
     }
 
-    // Check if session timer has expired
-    const now = new Date();
+    // 3. Check expiration
     if (session.expiresAt) {
       if (now > new Date(session.expiresAt)) {
         session.status = 'Closed';
@@ -139,17 +197,17 @@ const markAttendance = async (req, res) => {
       }
     }
 
-    // Check if attendance already marked
+    // 4. Check if attendance already marked (lean index lookup)
     const existingAttendance = await Attendance.findOne({
       studentId: student._id,
       sessionId: session._id,
-    });
+    }).select('_id').lean();
 
     if (existingAttendance) {
       return res.status(400).json({ message: 'Attendance already marked for this session' });
     }
 
-    // Mark attendance
+    // 5. Mark attendance
     const attendance = await Attendance.create({
       studentId: student._id,
       sessionId: session._id,
@@ -166,7 +224,7 @@ const markAttendance = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error marking attendance:', error);
     if (error.code === 11000) {
       return res.status(400).json({ message: 'Attendance already marked for this session' });
     }
@@ -174,7 +232,7 @@ const markAttendance = async (req, res) => {
   }
 };
 
-// @desc    Get attendance for a session
+// @desc    Get attendance for a session (optimized with lean)
 // @route   GET /api/attendance/session/:sessionId
 // @access  Private (Admin)
 const getSessionAttendance = async (req, res) => {
@@ -183,7 +241,8 @@ const getSessionAttendance = async (req, res) => {
 
     const attendance = await Attendance.find({ sessionId })
       .populate('studentId', 'name rollNumber mobileNumber email branch semester')
-      .sort({ attendanceTimestamp: 1 });
+      .sort({ attendanceTimestamp: 1 })
+      .lean();
 
     res.json({
       success: true,
@@ -195,23 +254,25 @@ const getSessionAttendance = async (req, res) => {
   }
 };
 
-// @desc    Get attendance history
+// @desc    Get attendance history (optimized with parallel execution & lean)
 // @route   GET /api/attendance/history
 // @access  Private (Admin)
 const getAttendanceHistory = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
     const skip = (page - 1) * limit;
 
-    const attendance = await Attendance.find()
-      .populate('studentId', 'name rollNumber branch semester')
-      .populate('sessionId', 'sessionName sessionDate')
-      .sort({ attendanceTimestamp: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Attendance.countDocuments();
+    const [attendance, total] = await Promise.all([
+      Attendance.find()
+        .populate('studentId', 'name rollNumber branch semester')
+        .populate('sessionId', 'sessionName sessionDate')
+        .sort({ attendanceTimestamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Attendance.countDocuments(),
+    ]);
 
     res.json({
       success: true,
@@ -220,7 +281,7 @@ const getAttendanceHistory = async (req, res) => {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / limit) || 1,
       },
     });
   } catch (error) {
@@ -234,4 +295,5 @@ module.exports = {
   markAttendance,
   getSessionAttendance,
   getAttendanceHistory,
+  invalidateActiveSessionCache,
 };

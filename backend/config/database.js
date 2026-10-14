@@ -7,17 +7,31 @@ if (!cached) {
 }
 
 const connectDB = async () => {
-  if (mongoose.connection.readyState >= 1) {
+  // 1. Check if global connection is active
+  if (mongoose.connection && mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
 
-  if (cached.conn) {
+  // 2. Check if cached connection is still active
+  if (cached.conn && cached.conn.readyState === 1) {
     return cached.conn;
+  }
+
+  // 3. If disconnected or stale, reset cached references
+  if (cached.conn && cached.conn.readyState === 0) {
+    cached.conn = null;
+    cached.promise = null;
   }
 
   if (!cached.promise) {
     const opts = {
-      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      maxIdleTimeMS: 30000, // Safely reap idle sockets on serverless / cloud
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 20000,
+      connectTimeoutMS: 10000,
+      family: 4, // Fast IPv4 resolution
     };
 
     const mongoUri = process.env.MONGO_URI || 'mongodb+srv://Kaifshere:Kaif444@cluster0.bogyqa2.mongodb.net/attendance-system?retryWrites=true&w=majority';
@@ -32,6 +46,7 @@ const connectDB = async () => {
     cached.conn = await cached.promise;
   } catch (error) {
     cached.promise = null;
+    cached.conn = null;
     console.error(`MongoDB Connection Error: ${error.message}`);
     throw error;
   }

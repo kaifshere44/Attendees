@@ -62,4 +62,6 @@ adminSchema.methods.isLocked = function() {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 };
 
+adminSchema.index({ role: 1 });
+
 module.exports = mongoose.model('Admin', adminSchema);

@@ -22,6 +22,17 @@ const formatAttendanceDateTime = (dateInput) => {
   return `${day}/${month}/${year} ${strHours}:${minutes} ${ampm}`;
 };
 
+// Format Date of Birth (e.g. YYYY-MM-DD -> DD/MM/YYYY)
+const formatDateOfBirth = (dob) => {
+  if (!dob || dob === 'N/A') return 'N/A';
+  const trimmed = String(dob).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return trimmed;
+};
+
 // Sanitize filename preserving session name (e.g., 'DSA Workshop' -> 'DSA_Workshop')
 const sanitizeSessionFilename = (sessionName) => {
   if (!sessionName || typeof sessionName !== 'string') {
@@ -48,9 +59,9 @@ const exportSessionExcel = async (req, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // Only students who attended this specific session
+    // Only students who attended this specific session, including Semester
     const attendance = await Attendance.find({ sessionId })
-      .populate('studentId', 'name rollNumber branch')
+      .populate('studentId', 'name rollNumber branch semester')
       .sort({ attendanceTimestamp: 1 })
       .lean();
 
@@ -63,18 +74,20 @@ const exportSessionExcel = async (req, res) => {
       views: [{ state: 'frozen', ySplit: 1 }]
     });
 
-    // Exact required columns:
+    // Session-wise columns (includes Semester; excludes Mobile Number and Email ID):
     // 1. Sr. No.
     // 2. Student Name
     // 3. Roll Number
     // 4. Branch/Course
-    // 5. Attendance Date & Time
+    // 5. Semester
+    // 6. Attendance Date & Time
     worksheet.columns = [
       { header: 'Sr. No.', key: 'srNo', width: 10 },
       { header: 'Student Name', key: 'name', width: 28 },
       { header: 'Roll Number', key: 'rollNumber', width: 18 },
-      { header: 'Branch/Course', key: 'branch', width: 24 },
-      { header: 'Attendance Date & Time', key: 'timestamp', width: 28 },
+      { header: 'Branch/Course', key: 'branch', width: 26 },
+      { header: 'Semester', key: 'semester', width: 16 },
+      { header: 'Attendance Date & Time', key: 'timestamp', width: 26 },
     ];
 
     attendance.forEach((record, index) => {
@@ -83,6 +96,7 @@ const exportSessionExcel = async (req, res) => {
         name: record.studentId?.name || 'N/A',
         rollNumber: record.studentId?.rollNumber || 'N/A',
         branch: record.studentId?.branch || 'N/A',
+        semester: record.studentId?.semester || 'N/A',
         timestamp: formatAttendanceDateTime(record.attendanceTimestamp),
       });
     });
@@ -106,6 +120,7 @@ const exportSessionExcel = async (req, res) => {
         row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left' };
         row.getCell('rollNumber').alignment = { vertical: 'middle', horizontal: 'left' };
         row.getCell('branch').alignment = { vertical: 'middle', horizontal: 'left' };
+        row.getCell('semester').alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell('timestamp').alignment = { vertical: 'middle', horizontal: 'center' };
       }
       row.eachCell((cell) => {
@@ -144,13 +159,13 @@ const exportSessionPdf = async (req, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    // Only students who attended this specific session
+    // Only students who attended this specific session, including Semester
     const attendance = await Attendance.find({ sessionId })
-      .populate('studentId', 'name rollNumber branch')
+      .populate('studentId', 'name rollNumber branch semester')
       .sort({ attendanceTimestamp: 1 })
       .lean();
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: false });
 
     // Report Header
     doc.setFontSize(18);
@@ -172,28 +187,35 @@ const exportSessionPdf = async (req, res) => {
     doc.setLineWidth(0.6);
     doc.line(14, 42, doc.internal.pageSize.width - 14, 42);
 
-    // Table Data
+    // Table Data - Semester included, Mobile & Email excluded
     const tableData = attendance.map((record, index) => [
       index + 1,
       record.studentId?.name || 'N/A',
       record.studentId?.rollNumber || 'N/A',
       record.studentId?.branch || 'N/A',
+      record.studentId?.semester || 'N/A',
       formatAttendanceDateTime(record.attendanceTimestamp),
     ]);
 
     if (tableData.length === 0) {
-      tableData.push(['-', 'No attendance records found for this session', '-', '-', '-']);
+      tableData.push([
+        {
+          content: 'No attendance records found for this session',
+          colSpan: 6,
+          styles: { halign: 'center', fontStyle: 'italic', textColor: [120, 120, 120] },
+        },
+      ]);
     }
 
     autoTable(doc, {
       startY: 46,
       showHead: 'everyPage',
-      head: [['Sr. No.', 'Student Name', 'Roll Number', 'Branch/Course', 'Attendance Date & Time']],
+      head: [['Sr. No.', 'Student Name', 'Roll Number', 'Branch/Course', 'Semester', 'Attendance Date & Time']],
       body: tableData,
       margin: { top: 46, bottom: 20, left: 14, right: 14 },
       styles: {
-        fontSize: 9,
-        cellPadding: 3,
+        fontSize: 8.5,
+        cellPadding: 2.2,
         overflow: 'linebreak',
         textColor: [40, 40, 40],
       },
@@ -204,11 +226,12 @@ const exportSessionPdf = async (req, res) => {
         halign: 'center',
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 16 },
-        1: { halign: 'left', cellWidth: 50 },
-        2: { halign: 'left', cellWidth: 32 },
-        3: { halign: 'left', cellWidth: 38 },
-        4: { halign: 'center', cellWidth: 46 },
+        0: { halign: 'center', cellWidth: 12 },
+        1: { halign: 'left', cellWidth: 42 },
+        2: { halign: 'left', cellWidth: 26 },
+        3: { halign: 'left', cellWidth: 32 },
+        4: { halign: 'center', cellWidth: 22 },
+        5: { halign: 'center', cellWidth: 48 },
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252],
@@ -262,20 +285,28 @@ const exportStudentsExcel = async (req, res) => {
       views: [{ state: 'frozen', ySplit: 1 }]
     });
 
-    // Exact required columns:
+    // All registered details collected in student registration:
     // 1. Sr. No.
     // 2. Student Name
     // 3. Roll Number
     // 4. Branch/Course
-    // 5. Mobile Number
-    // 6. Email ID
+    // 5. Semester
+    // 6. Date of Birth
+    // 7. Mobile Number
+    // 8. Email ID
+    // 9. Academic Year
+    // 10. Registration Date
     worksheet.columns = [
       { header: 'Sr. No.', key: 'srNo', width: 10 },
       { header: 'Student Name', key: 'name', width: 28 },
       { header: 'Roll Number', key: 'rollNumber', width: 18 },
-      { header: 'Branch/Course', key: 'branch', width: 24 },
+      { header: 'Branch/Course', key: 'branch', width: 32 },
+      { header: 'Semester', key: 'semester', width: 16 },
+      { header: 'Date of Birth', key: 'dob', width: 16 },
       { header: 'Mobile Number', key: 'mobileNumber', width: 18 },
       { header: 'Email ID', key: 'email', width: 32 },
+      { header: 'Academic Year', key: 'academicYear', width: 16 },
+      { header: 'Registration Date', key: 'registeredAt', width: 24 },
     ];
 
     students.forEach((student, index) => {
@@ -284,8 +315,12 @@ const exportStudentsExcel = async (req, res) => {
         name: student.name || 'N/A',
         rollNumber: student.rollNumber || 'N/A',
         branch: student.branch || 'N/A',
+        semester: student.semester || 'N/A',
+        dob: formatDateOfBirth(student.dateOfBirth),
         mobileNumber: student.mobileNumber || 'N/A',
         email: student.email || 'N/A',
+        academicYear: student.academicYear || 'N/A',
+        registeredAt: student.createdAt ? formatAttendanceDateTime(student.createdAt) : 'N/A',
       });
     });
 
@@ -308,8 +343,12 @@ const exportStudentsExcel = async (req, res) => {
         row.getCell('name').alignment = { vertical: 'middle', horizontal: 'left' };
         row.getCell('rollNumber').alignment = { vertical: 'middle', horizontal: 'left' };
         row.getCell('branch').alignment = { vertical: 'middle', horizontal: 'left' };
+        row.getCell('semester').alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell('dob').alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell('mobileNumber').alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell('email').alignment = { vertical: 'middle', horizontal: 'left' };
+        row.getCell('academicYear').alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell('registeredAt').alignment = { vertical: 'middle', horizontal: 'center' };
       }
       row.eachCell((cell) => {
         cell.border = {
@@ -342,48 +381,70 @@ const exportStudentsPdf = async (req, res) => {
   try {
     const students = await Student.find().sort({ rollNumber: 1 }).lean();
 
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // Use landscape A4 (297mm width) so all 10 registration columns fit legibly with perfect padding
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: false });
 
     // Title & Header
     doc.setFontSize(18);
     doc.setTextColor(28, 40, 65);
-    doc.text('Registered Students Directory', 14, 18);
+    doc.text('Registered Students Directory', 14, 16);
 
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(60, 60, 60);
-    doc.text(`Total Registered Students: ${students.length}`, 14, 26);
+    doc.text(`Total Registered Students: ${students.length}`, 14, 23);
 
-    doc.setFontSize(9.5);
+    doc.setFontSize(9);
     doc.setTextColor(110, 110, 110);
-    doc.text(`Generated on: ${formatAttendanceDateTime(new Date())}`, 14, 33);
+    doc.text(`Generated on: ${formatAttendanceDateTime(new Date())}`, 14, 29);
 
     // Accent Line
     doc.setDrawColor(28, 40, 65);
     doc.setLineWidth(0.6);
-    doc.line(14, 36, doc.internal.pageSize.width - 14, 36);
+    doc.line(14, 32, doc.internal.pageSize.width - 14, 32);
 
     const tableData = students.map((student, index) => [
       index + 1,
       student.name || 'N/A',
       student.rollNumber || 'N/A',
       student.branch || 'N/A',
+      student.semester || 'N/A',
+      formatDateOfBirth(student.dateOfBirth),
       student.mobileNumber || 'N/A',
       student.email || 'N/A',
+      student.academicYear || 'N/A',
+      student.createdAt ? formatAttendanceDateTime(student.createdAt) : 'N/A',
     ]);
 
     if (tableData.length === 0) {
-      tableData.push(['-', 'No registered students found', '-', '-', '-', '-']);
+      tableData.push([
+        {
+          content: 'No registered students found',
+          colSpan: 10,
+          styles: { halign: 'center', fontStyle: 'italic', textColor: [120, 120, 120] },
+        },
+      ]);
     }
 
     autoTable(doc, {
-      startY: 40,
+      startY: 36,
       showHead: 'everyPage',
-      head: [['Sr. No.', 'Student Name', 'Roll Number', 'Branch/Course', 'Mobile Number', 'Email ID']],
+      head: [[
+        'Sr. No.',
+        'Student Name',
+        'Roll Number',
+        'Branch/Course',
+        'Semester',
+        'Date of Birth',
+        'Mobile Number',
+        'Email ID',
+        'Academic Year',
+        'Registration Date'
+      ]],
       body: tableData,
-      margin: { top: 40, bottom: 20, left: 14, right: 14 },
+      margin: { top: 36, bottom: 18, left: 14, right: 14 },
       styles: {
-        fontSize: 8.5,
-        cellPadding: 2.8,
+        fontSize: 8,
+        cellPadding: 2.2,
         overflow: 'linebreak',
         textColor: [40, 40, 40],
       },
@@ -394,12 +455,16 @@ const exportStudentsPdf = async (req, res) => {
         halign: 'center',
       },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 14 },
-        1: { halign: 'left', cellWidth: 40 },
-        2: { halign: 'left', cellWidth: 28 },
-        3: { halign: 'left', cellWidth: 30 },
-        4: { halign: 'center', cellWidth: 28 },
-        5: { halign: 'left', cellWidth: 42 },
+        0: { halign: 'center', cellWidth: 12 },
+        1: { halign: 'left', cellWidth: 34 },
+        2: { halign: 'left', cellWidth: 24 },
+        3: { halign: 'left', cellWidth: 44 },
+        4: { halign: 'center', cellWidth: 22 },
+        5: { halign: 'center', cellWidth: 22 },
+        6: { halign: 'center', cellWidth: 26 },
+        7: { halign: 'left', cellWidth: 42 },
+        8: { halign: 'center', cellWidth: 21 },
+        9: { halign: 'center', cellWidth: 22 },
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252],
@@ -414,12 +479,12 @@ const exportStudentsPdf = async (req, res) => {
       doc.text(
         `Page ${i} of ${pageCount}`,
         doc.internal.pageSize.width - 25,
-        doc.internal.pageSize.height - 10
+        doc.internal.pageSize.height - 8
       );
       doc.text(
         'Attendance Management System',
         14,
-        doc.internal.pageSize.height - 10
+        doc.internal.pageSize.height - 8
       );
     }
 

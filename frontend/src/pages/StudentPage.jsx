@@ -242,7 +242,7 @@ const StudentPage = () => {
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-xl shadow-lg p-4 md:p-8">
           <h1 className="text-2xl md:text-3xl font-bold text-yankees-blue mb-2 text-center">Mark your Attendance</h1>
-          <p className="text-gray-600 text-center mb-6 md:mb-8 text-sm md:text-base">Enter your roll number to continue</p>
+          <p className="text-gray-600 text-center mb-6 md:mb-8 text-sm md:text-base">Glad to Have You Here!</p>
 
           {step === 'rollcheck' && (
             <div className="space-y-6">
@@ -253,7 +253,7 @@ const StudentPage = () => {
                     type="text"
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                    placeholder="Enter your roll number"
+                    placeholder="Enter your roll number to continue"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-lg"
                     disabled={loading}
                     autoFocus
@@ -293,7 +293,7 @@ const StudentPage = () => {
                 ← Back
               </button>
 
-              <h2 className="text-xl md:text-2xl font-bold text-yankees-blue">Glad to Have You Here!</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-yankees-blue">Ensure your details are accurate</h2>
 
               <form onSubmit={handleRegister} className="space-y-3 md:space-y-4">
                 <div>

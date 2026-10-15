@@ -35,11 +35,27 @@ const connectDB = async () => {
     };
 
     const mongoUri = process.env.MONGO_URI || 'mongodb+srv://Kaifshere:Kaif444@cluster0.bogyqa2.mongodb.net/attendance-system?retryWrites=true&w=majority';
+    const localUri = process.env.LOCAL_MONGO_URI || 'mongodb://127.0.0.1:27017/attendance-system';
 
-    cached.promise = mongoose.connect(mongoUri, opts).then((m) => {
-      console.log(`MongoDB Connected: ${m.connection.host}`);
-      return m.connection;
-    });
+    cached.promise = mongoose.connect(mongoUri, opts)
+      .then((m) => {
+        console.log(`MongoDB Connected: ${m.connection.host}`);
+        return m.connection;
+      })
+      .catch(async (atlasErr) => {
+        if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+          console.warn(`Primary MongoDB connection failed (${atlasErr.message}). Attempting local fallback: ${localUri}`);
+          try {
+            const localM = await mongoose.connect(localUri, opts);
+            console.log(`MongoDB Connected (Local Fallback): ${localM.connection.host}`);
+            return localM.connection;
+          } catch (localErr) {
+            console.error(`Local MongoDB fallback error: ${localErr.message}`);
+            throw atlasErr;
+          }
+        }
+        throw atlasErr;
+      });
   }
 
   try {

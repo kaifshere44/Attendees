@@ -1,11 +1,71 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, Calendar, Clock, Plus, Play, Square, RefreshCw, Menu, X, FileSpreadsheet, FileText, Search, Loader2, MessageSquarePlus, Cake, Key } from 'lucide-react';
+import { LogOut, Users, Calendar, Clock, Plus, Play, Square, RefreshCw, Menu, X, FileSpreadsheet, FileText, Search, Loader2, MessageSquarePlus, Cake, Key, Edit, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import authService from '../services/authService';
 import Toast from '../components/Toast';
 import BirthdaysSection, { getBirthdayMeta } from '../components/BirthdaysSection';
 import ManageAdminCredentials from '../components/ManageAdminCredentials';
+
+const COURSE_OPTIONS = [
+  'B.Tech (Computer Science and Engineering)',
+  'B.Tech (Robotics and AI)',
+  'B.Tech (EE- VLSI Design and Technology)',
+  'Bachelor of Science (B.Sc) - Computer Science',
+  'BA',
+  'BA (H)',
+  'B.Com',
+  'B.Com (H)',
+  'BBA',
+  'BBA (H)',
+  'BCA',
+  'BCA (H)',
+  'Bachelor of Science (B.Sc) - Physics',
+  'Bachelor of Science (B.Sc) - ZBC',
+  'Bachelor of Science (B.Sc) - Mathematics',
+  'MCA',
+  'MBA',
+  'Ph.D',
+  'Other',
+];
+
+const COURSE_SEMESTER_COUNTS = {
+  'B.Tech (Computer Science and Engineering)': 8,
+  'B.Tech (Robotics and AI)': 8,
+  'B.Tech (EE- VLSI Design and Technology)': 8,
+  'Bachelor of Science (B.Sc) - Computer Science': 6,
+  'BA': 6,
+  'BA (H)': 8,
+  'B.Com': 6,
+  'B.Com (H)': 8,
+  'BBA': 6,
+  'BBA (H)': 8,
+  'BCA': 6,
+  'BCA (H)': 8,
+  'Bachelor of Science (B.Sc) - Physics': 6,
+  'Bachelor of Science (B.Sc) - ZBC': 6,
+  'Bachelor of Science (B.Sc) - Mathematics': 6,
+  'MCA': 4,
+  'MBA': 4,
+  'Ph.D': 0,
+  'Other': 8,
+};
+
+const getOrdinal = (n) => {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
+const getAvailableSemesters = (course) => {
+  if (!course || course === 'Ph.D') return [];
+  const max = COURSE_SEMESTER_COUNTS[course] || 8;
+  const list = [];
+  for (let i = 1; i <= max; i++) {
+    list.push(`${getOrdinal(i)} Semester`);
+  }
+  return list;
+};
 
 const SuperAdminDashboard = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -48,6 +108,22 @@ const SuperAdminDashboard = ({ onLogout }) => {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPagination, setHistoryPagination] = useState({ page: 1, limit: 50, total: 0, pages: 1 });
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [deletingStudent, setDeletingStudent] = useState(null);
+  const [editStudentLoading, setEditStudentLoading] = useState(false);
+  const [deleteStudentLoading, setDeleteStudentLoading] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    rollNumber: '',
+    mobileNumber: '',
+    email: '',
+    branch: '',
+    semester: '',
+    academicYear: '',
+    dateOfBirth: '',
+  });
+  const [editSelectedCourse, setEditSelectedCourse] = useState('');
+  const [editCustomCourse, setEditCustomCourse] = useState('');
   const navigate = useNavigate();
 
   const admin = authService.getCurrentAdmin();
@@ -439,6 +515,131 @@ const SuperAdminDashboard = ({ onLogout }) => {
       showToast(msg, 'error');
     } finally {
       setDownloading((prev) => ({ ...prev, 'students-pdf': false }));
+    }
+  };
+
+  const handleOpenEditModal = (student) => {
+    setEditingStudent(student);
+    const isPredefined = COURSE_OPTIONS.includes(student.branch);
+    const course = isPredefined ? student.branch : (student.branch ? 'Other' : '');
+    setEditSelectedCourse(course);
+    setEditCustomCourse(isPredefined ? '' : (student.branch || ''));
+    setEditFormData({
+      name: student.name || '',
+      rollNumber: student.rollNumber || '',
+      mobileNumber: student.mobileNumber || '',
+      email: student.email || '',
+      branch: student.branch || '',
+      semester: student.semester || '',
+      academicYear: student.academicYear || '',
+      dateOfBirth: student.dateOfBirth
+        ? (student.dateOfBirth.includes('T') ? student.dateOfBirth.split('T')[0] : student.dateOfBirth)
+        : '',
+    });
+  };
+
+  const handleCloseEditModal = () => {
+    if (editStudentLoading) return;
+    setEditingStudent(null);
+  };
+
+  const handleSaveEditStudent = async (e) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    const studentId = editingStudent._id || editingStudent.id;
+    if (!studentId) {
+      showToast('Invalid student ID', 'error');
+      return;
+    }
+
+    if (!editFormData.name.trim() || !editFormData.rollNumber.trim() || !editFormData.mobileNumber.trim() || !editFormData.email.trim() || !editFormData.branch.trim()) {
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+
+    if (editSelectedCourse !== 'Ph.D' && !editFormData.semester.trim()) {
+      showToast('Please select a semester', 'error');
+      return;
+    }
+
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(editFormData.mobileNumber.trim())) {
+      showToast('Mobile number must be a valid 10-digit Indian number', 'error');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editFormData.email.trim())) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+
+    setEditStudentLoading(true);
+    try {
+      const payload = {
+        name: editFormData.name.trim(),
+        rollNumber: editFormData.rollNumber.trim().toUpperCase(),
+        mobileNumber: editFormData.mobileNumber.trim(),
+        email: editFormData.email.trim().toLowerCase(),
+        branch: editFormData.branch.trim(),
+        semester: editSelectedCourse === 'Ph.D' ? 'N/A' : editFormData.semester.trim(),
+        academicYear: editFormData.academicYear?.trim() || undefined,
+        dateOfBirth: editFormData.dateOfBirth?.trim() || undefined,
+      };
+
+      const response = await api.put(`/students/${studentId}`, payload);
+      if (response.data.success) {
+        showToast(response.data.message || 'Student details updated successfully!', 'success');
+        setEditingStudent(null);
+        fetchStudents(studentPage, studentSearch);
+        fetchBirthdayBadge();
+      }
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.message ||
+        (typeof error.response?.data === 'string' && error.response.data.includes('Cannot PUT')
+          ? 'Update student endpoint is not reachable on the server'
+          : null) ||
+        error.message ||
+        'Error updating student';
+      showToast(errorMsg, 'error');
+    } finally {
+      setEditStudentLoading(false);
+    }
+  };
+
+  const handleOpenDeleteModal = (student) => {
+    setDeletingStudent(student);
+  };
+
+  const handleConfirmDeleteStudent = async () => {
+    if (!deletingStudent) return;
+    const studentId = deletingStudent._id || deletingStudent.id;
+    if (!studentId) {
+      showToast('Invalid student ID', 'error');
+      return;
+    }
+    setDeleteStudentLoading(true);
+    try {
+      const response = await api.delete(`/students/${studentId}`);
+      if (response.data.success) {
+        showToast(response.data.message || `Student ${deletingStudent.name} (${deletingStudent.rollNumber}) deleted successfully`, 'success');
+        setDeletingStudent(null);
+        const targetPage = (students.length === 1 && studentPage > 1) ? studentPage - 1 : studentPage;
+        fetchStudents(targetPage, studentSearch);
+        fetchBirthdayBadge();
+      }
+    } catch (error) {
+      const errorMsg =
+        error.response?.data?.message ||
+        (typeof error.response?.data === 'string' && error.response.data.includes('Cannot DELETE')
+          ? 'Delete student endpoint is not reachable on the server'
+          : null) ||
+        error.message ||
+        'Error deleting student';
+      showToast(errorMsg, 'error');
+    } finally {
+      setDeleteStudentLoading(false);
     }
   };
 
@@ -1093,20 +1294,43 @@ const SuperAdminDashboard = ({ onLogout }) => {
                             <th className="text-left py-3 px-4">Branch</th>
                             <th className="text-left py-3 px-4">Semester</th>
                             <th className="text-left py-3 px-4">Registered</th>
+                            <th className="text-center py-3 px-4">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
                           {students.map((student, index) => (
                             <tr key={student._id} className="border-b hover:bg-light-bg">
-                              <td className="py-3 px-4">{index + 1}</td>
-                              <td className="py-3 px-4">{student.name}</td>
-                              <td className="py-3 px-4">{student.rollNumber}</td>
-                              <td className="py-3 px-4">{student.mobileNumber}</td>
-                              <td className="py-3 px-4">{student.email}</td>
-                              <td className="py-3 px-4">{student.branch}</td>
-                              <td className="py-3 px-4">{student.semester}</td>
                               <td className="py-3 px-4">
+                                {(studentPagination.page - 1) * studentPagination.limit + index + 1}
+                              </td>
+                              <td className="py-3 px-4 font-medium text-yankees-blue">{student.name}</td>
+                              <td className="py-3 px-4 font-mono font-semibold">{student.rollNumber}</td>
+                              <td className="py-3 px-4 font-mono text-sm">{student.mobileNumber}</td>
+                              <td className="py-3 px-4 text-sm">{student.email}</td>
+                              <td className="py-3 px-4 text-sm">{student.branch}</td>
+                              <td className="py-3 px-4 text-sm">{student.semester}</td>
+                              <td className="py-3 px-4 text-sm text-gray-500">
                                 {new Date(student.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => handleOpenEditModal(student)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-yankees-blue bg-burlywood/20 hover:bg-burlywood/35 border border-burlywood/40 rounded-lg transition cursor-pointer"
+                                    title="Edit Student Registration"
+                                  >
+                                    <Edit size={14} className="text-yankees-blue" />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleOpenDeleteModal(student)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition cursor-pointer"
+                                    title="Delete Student Record"
+                                  >
+                                    <Trash2 size={14} className="text-red-600" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -1140,6 +1364,302 @@ const SuperAdminDashboard = ({ onLogout }) => {
                     </div>
                   )}
                 </div>
+
+                {/* Edit Student Modal */}
+                {editingStudent && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden border border-gray-100 flex flex-col">
+                      {/* Modal Header */}
+                      <div className="bg-yankees-blue text-white p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-white/10 rounded-lg">
+                            <Edit className="w-5 h-5 text-burlywood" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg">Edit Student Registration</h3>
+                            <p className="text-xs text-gray-300">
+                              Original Roll: <span className="font-mono text-burlywood font-semibold">{editingStudent.rollNumber}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleCloseEditModal}
+                          disabled={editStudentLoading}
+                          className="p-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 cursor-pointer disabled:opacity-50"
+                        >
+                          <X size={20} />
+                        </button>
+                      </div>
+
+                      {/* Modal Form Body */}
+                      <form onSubmit={handleSaveEditStudent} className="p-6 overflow-y-auto space-y-4 flex-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Full Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={editFormData.name}
+                              onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm"
+                              required
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Roll Number *
+                            </label>
+                            <input
+                              type="text"
+                              value={editFormData.rollNumber}
+                              onChange={(e) => setEditFormData({ ...editFormData, rollNumber: e.target.value.toUpperCase() })}
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm uppercase font-mono font-medium"
+                              required
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Mobile Number *
+                            </label>
+                            <input
+                              type="tel"
+                              value={editFormData.mobileNumber}
+                              onChange={(e) => setEditFormData({ ...editFormData, mobileNumber: e.target.value })}
+                              placeholder="10-digit number"
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm font-mono"
+                              required
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Email Address *
+                            </label>
+                            <input
+                              type="email"
+                              value={editFormData.email}
+                              onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value.toLowerCase() })}
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm"
+                              required
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+
+                          <div className={editSelectedCourse === 'Other' ? 'sm:col-span-1' : 'sm:col-span-2'}>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Course / Program *
+                            </label>
+                            <select
+                              value={editSelectedCourse}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setEditSelectedCourse(val);
+                                const available = getAvailableSemesters(val);
+                                if (val !== 'Other') {
+                                  setEditFormData((prev) => {
+                                    let nextSem = prev.semester;
+                                    if (val === 'Ph.D') {
+                                      nextSem = 'N/A';
+                                    } else if (!available.includes(prev.semester)) {
+                                      nextSem = available[0] || '';
+                                    }
+                                    return { ...prev, branch: val, semester: nextSem };
+                                  });
+                                } else {
+                                  setEditFormData((prev) => ({
+                                    ...prev,
+                                    branch: editCustomCourse.trim(),
+                                  }));
+                                }
+                              }}
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm bg-white"
+                              required
+                              disabled={editStudentLoading}
+                            >
+                              <option value="" disabled>Select Course / Program</option>
+                              {COURSE_OPTIONS.map((course) => (
+                                <option key={course} value={course}>
+                                  {course}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {editSelectedCourse === 'Other' && (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                                Custom Course Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={editCustomCourse}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setEditCustomCourse(val);
+                                  setEditFormData((prev) => ({ ...prev, branch: val }));
+                                }}
+                                placeholder="Enter course name"
+                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm"
+                                required
+                                disabled={editStudentLoading}
+                              />
+                            </div>
+                          )}
+
+                          {editSelectedCourse !== 'Ph.D' && (
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                                Semester *
+                              </label>
+                              <select
+                                value={editFormData.semester}
+                                onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
+                                className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm bg-white"
+                                required={editSelectedCourse !== 'Ph.D'}
+                                disabled={editStudentLoading || !editSelectedCourse}
+                              >
+                                <option value="" disabled>
+                                  {!editSelectedCourse ? 'Select Course First' : 'Select Semester'}
+                                </option>
+                                {getAvailableSemesters(editSelectedCourse).map((sem) => (
+                                  <option key={sem} value={sem}>
+                                    {sem}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Date of Birth (Optional)
+                            </label>
+                            <input
+                              type="date"
+                              value={editFormData.dateOfBirth}
+                              onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value })}
+                              max={new Date().toISOString().split('T')[0]}
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm bg-white"
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                              Academic Year (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={editFormData.academicYear}
+                              onChange={(e) => setEditFormData({ ...editFormData, academicYear: e.target.value })}
+                              placeholder="e.g. 2025-2026"
+                              className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-sm"
+                              disabled={editStudentLoading}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                          <button
+                            type="button"
+                            onClick={handleCloseEditModal}
+                            disabled={editStudentLoading}
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition text-sm disabled:opacity-50 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={editStudentLoading}
+                            className="px-5 py-2 bg-yankees-blue text-white font-medium rounded-lg hover:bg-opacity-90 transition text-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            {editStudentLoading ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Saving Changes...
+                              </>
+                            ) : (
+                              'Save Changes'
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delete Student Confirmation Dialog */}
+                {deletingStudent && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-gray-100">
+                      <div className="p-6">
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className="p-3 bg-red-100 text-red-600 rounded-full flex-shrink-0">
+                            <AlertTriangle className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">Delete Student Record?</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">This action is permanent and cannot be undone</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-5 text-sm text-gray-700 space-y-1.5">
+                          <p>
+                            <span className="font-semibold text-gray-900">Student:</span> {deletingStudent.name}
+                          </p>
+                          <p>
+                            <span className="font-semibold text-gray-900">Roll Number:</span>{' '}
+                            <span className="font-mono font-bold text-red-700">{deletingStudent.rollNumber}</span>
+                          </p>
+                          <p>
+                            <span className="font-semibold text-gray-900">Course:</span> {deletingStudent.branch} ({deletingStudent.semester})
+                          </p>
+                          <p className="text-xs text-amber-700 pt-1 font-medium">
+                            Note: Historical attendance records are strictly protected. Students with existing attendance logs cannot be deleted.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!deleteStudentLoading) setDeletingStudent(null);
+                            }}
+                            disabled={deleteStudentLoading}
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition text-sm disabled:opacity-50 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleConfirmDeleteStudent}
+                            disabled={deleteStudentLoading}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition text-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                          >
+                            {deleteStudentLoading ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Deleting...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 size={16} />
+                                Confirm Delete
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

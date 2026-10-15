@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
+const Attendance = require('../models/Attendance');
 
 // High-speed in-memory caches for frequent reads
 const ROLL_CACHE_TTL = 60 * 1000; // 60 seconds
@@ -299,4 +301,161 @@ const getStudentBirthdays = async (req, res) => {
   }
 };
 
-module.exports = { registerStudent, checkRollNumber, getStudent, getAllStudents, getStudentBirthdays };
+// @desc    Update student details (Super Admin only)
+// @route   PUT /api/students/:id
+// @access  Private (Super Admin)
+const updateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid student ID format' });
+    }
+
+    const { name, rollNumber, mobileNumber, email, branch, semester, academicYear, dateOfBirth, dob } = req.body;
+
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Resolve semester (defaults to 'N/A' for Ph.D if omitted)
+    const resolvedSemester = semester && semester.trim() ? semester.trim() : (branch && branch.toLowerCase().includes('ph.d') ? 'N/A' : '');
+
+    // Validate required fields
+    if (!name || !rollNumber || !mobileNumber || !email || !branch || !resolvedSemester) {
+      return res.status(400).json({ success: false, message: 'All required fields must be provided' });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Invalid email format' });
+    }
+
+    // Validate Indian mobile number
+    const mobileRegex = /^[6-9]\d{9}$/;
+    if (!mobileRegex.test(mobileNumber)) {
+      return res.status(400).json({ success: false, message: 'Invalid mobile number format (must be 10 digits starting with 6-9)' });
+    }
+
+    // Normalize roll number and email
+    const normalizedRollNumber = rollNumber.trim().toUpperCase();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check uniqueness if rollNumber or email changed
+    const conflict = await Student.findOne({
+      _id: { $ne: id },
+      $or: [
+        { rollNumber: normalizedRollNumber },
+        { email: normalizedEmail }
+      ]
+    }).select('rollNumber email').lean();
+
+    if (conflict) {
+      if (conflict.rollNumber === normalizedRollNumber) {
+        return res.status(400).json({ success: false, message: 'Another student with this roll number already exists' });
+      }
+      if (conflict.email === normalizedEmail) {
+        return res.status(400).json({ success: false, message: 'Another student with this email already exists' });
+      }
+    }
+
+    const oldRollNumber = student.rollNumber;
+
+    student.name = name.trim();
+    student.rollNumber = normalizedRollNumber;
+    student.mobileNumber = mobileNumber.trim();
+    student.email = normalizedEmail;
+    student.branch = branch.trim();
+    student.semester = resolvedSemester;
+    student.academicYear = academicYear && academicYear.trim() ? academicYear.trim() : undefined;
+    student.dateOfBirth = (dateOfBirth || dob) && (dateOfBirth || dob).trim() ? (dateOfBirth || dob).trim() : undefined;
+
+    await student.save();
+
+    // Invalidate roll caches
+    invalidateRollCache(oldRollNumber);
+    invalidateRollCache(normalizedRollNumber);
+    setInRollCache(normalizedRollNumber, {
+      success: true,
+      exists: true,
+      student: {
+        id: student._id,
+        name: student.name,
+        rollNumber: student.rollNumber,
+      },
+    });
+
+    // Invalidate birthday cache
+    birthdayCache.data = null;
+    birthdayCache.expiresAt = 0;
+
+    res.json({
+      success: true,
+      message: 'Student updated successfully',
+      student,
+    });
+  } catch (error) {
+    console.error('updateStudent error:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ success: false, message: 'Student with this roll number or email already exists' });
+    }
+    res.status(500).json({ success: false, message: error.message || 'Server error updating student' });
+  }
+};
+
+// @desc    Delete a student safely (Super Admin only - preserves historical attendance data)
+// @route   DELETE /api/students/:id
+// @access  Private (Super Admin)
+const deleteStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid student ID format' });
+    }
+
+    const student = await Student.findById(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Student not found' });
+    }
+
+    // Critical data protection: Check if student has attendance records
+    // Do NOT silently delete historical attendance records or break database relationships.
+    const attendanceCount = await Attendance.countDocuments({ studentId: id });
+    if (attendanceCount > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete student "${student.name}" (${student.rollNumber}) because they have ${attendanceCount} existing attendance record(s). Historical attendance data must be preserved.`,
+        attendanceCount,
+      });
+    }
+
+    const rollToDelete = student.rollNumber;
+    await Student.findByIdAndDelete(id);
+
+    // Clear caches
+    invalidateRollCache(rollToDelete);
+    birthdayCache.data = null;
+    birthdayCache.expiresAt = 0;
+
+    res.json({
+      success: true,
+      message: `Student "${student.name}" (${rollToDelete}) deleted successfully`,
+    });
+  } catch (error) {
+    console.error('deleteStudent error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error deleting student' });
+  }
+};
+
+module.exports = {
+  registerStudent,
+  checkRollNumber,
+  getStudent,
+  getAllStudents,
+  getStudentBirthdays,
+  updateStudent,
+  deleteStudent,
+};

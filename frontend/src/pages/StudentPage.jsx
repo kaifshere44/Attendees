@@ -253,7 +253,7 @@ const StudentPage = () => {
                     type="text"
                     value={rollNumber}
                     onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                    placeholder="Enter your roll number to continue"
+                    placeholder="Enter your roll number"
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yankees-blue text-lg"
                     disabled={loading}
                     autoFocus

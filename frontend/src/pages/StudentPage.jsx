@@ -293,7 +293,7 @@ const StudentPage = () => {
                 ← Back
               </button>
 
-              <h2 className="text-xl md:text-2xl font-bold text-yankees-blue">New Student Registration</h2>
+              <h2 className="text-xl md:text-2xl font-bold text-yankees-blue">Glad to Have You Here!</h2>
 
               <form onSubmit={handleRegister} className="space-y-3 md:space-y-4">
                 <div>
